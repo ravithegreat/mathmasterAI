@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { GradeLevel, MathTopic, MathQuestion } from "./types";
 
@@ -7,19 +6,16 @@ export const generateMathQuestion = async (
   topic: MathTopic,
   difficulty: number
 ): Promise<MathQuestion> => {
-  const apiKey = process.env.API_KEY;
+  // Always initialize inside the service or right before use to ensure the most current API key
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  if (!apiKey) {
-    throw new Error("API_KEY is missing. Please set it in your environment variables (e.g., in Vercel settings).");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-3-flash-preview";
+  // Use Pro model for complex math reasoning
+  const model = "gemini-3-pro-preview";
   
   const prompt = `Generate a unique multiple-choice math question for Grade ${grade} students on the topic of ${topic}. 
-  The difficulty level is ${difficulty}/10 (1 is basic, 10 is extremely advanced/olympiad level). 
+  The difficulty level is ${difficulty}/10 (1 is basic foundations, 10 is extremely advanced competitive math). 
   Make sure the question is challenging yet appropriate for the grade level. 
-  The response must be in JSON format.`;
+  The response must be in strict JSON format.`;
 
   const response = await ai.models.generateContent({
     model,
@@ -33,15 +29,15 @@ export const generateMathQuestion = async (
           options: {
             type: Type.ARRAY,
             items: { type: Type.STRING },
-            description: "Four multiple choice options"
+            description: "Exactly four multiple choice options"
           },
           correctAnswerIndex: {
             type: Type.INTEGER,
-            description: "The 0-based index of the correct answer in the options array"
+            description: "The 0-based index of the correct answer"
           },
           explanation: {
             type: Type.STRING,
-            description: "A short, encouraging explanation of how to solve the problem"
+            description: "A clear, encouraging step-by-step explanation"
           }
         },
         required: ["question", "options", "correctAnswerIndex", "explanation"]
@@ -49,8 +45,10 @@ export const generateMathQuestion = async (
     }
   });
 
-  const rawJson = response.text || "{}";
-  const data = JSON.parse(rawJson);
+  const text = response.text;
+  if (!text) throw new Error("Empty response from AI");
+  
+  const data = JSON.parse(text);
   
   return {
     ...data,
